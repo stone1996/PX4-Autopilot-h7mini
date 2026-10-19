@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: PX4/PX4-Autopilot
           ref: v1.17.0
           submodules: recursive
           fetch-depth: 0
