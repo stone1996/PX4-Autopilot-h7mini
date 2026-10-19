@@ -1,0 +1,51 @@
+name: Build Kakute H7 (trimmed)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v1.17.0
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          bash ./Tools/setup/ubuntu.sh --no-sim-tools
+
+      - name: Trim board config to fit flash
+        run: |
+          f=boards/holybro/kakuteh7/default.px4board
+          # unused for a multicopter with lidar/UWB external vision
+          for k in MODULES_GYRO_FFT \
+                   MODULES_FW_ATT_CONTROL MODULES_FW_AUTOTUNE_ATTITUDE_CONTROL \
+                   MODULES_FW_LATERAL_LONGITUDINAL_CONTROL MODULES_FW_MODE_MANAGER \
+                   MODULES_FW_RATE_CONTROL MODULES_VTOL_ATT_CONTROL \
+                   MODULES_AIRSPEED_SELECTOR MODULES_SIMULATION_SIMULATOR_SIH \
+                   MODULES_LANDING_TARGET_ESTIMATOR MODULES_CAMERA_FEEDBACK \
+                   DRIVERS_CAMERA_CAPTURE DRIVERS_CAMERA_TRIGGER \
+                   COMMON_DIFFERENTIAL_PRESSURE; do
+            sed -i "/^CONFIG_${k}=y/d" "$f"
+          done
+          cat "$f"
+
+      - name: Build
+        run: make holybro_kakuteh7_default
+
+      - name: Check size (limit 1703936 bytes)
+        run: |
+          ls -l build/holybro_kakuteh7_default/*.bin build/holybro_kakuteh7_default/*.px4
+          size=$(stat -c %s build/holybro_kakuteh7_default/holybro_kakuteh7_default.bin)
+          echo "bin size: $size"
+          test "$size" -le 1703936
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: holybro_kakuteh7_trimmed
+          path: build/holybro_kakuteh7_default/holybro_kakuteh7_default.px4
